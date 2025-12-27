@@ -12,7 +12,6 @@ import io
 import warnings
 warnings.filterwarnings('ignore')
 
-# ========================= CONFIGURATION DE LA PAGE =========================
 st.set_page_config(
     page_title="Prédiction Souscription Assurance Automobile",
     page_icon="🏦",
@@ -20,19 +19,114 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Couleurs professionnelles
-PRIMARY_COLOR = "#003366"
-SECONDARY_COLOR = "#005588"
-ACCENT_COLOR = "#00A0DF"
-LIGHT_GRAY = "#F5F7FA"
-DARK_GRAY = "#333333"
 
-# ========================= CHARGEMENT DES DONNÉES ET MODÈLE =========================
+st.markdown("""
+<style>
+    /* Fond clair */
+    .main, .stApp {
+        background-color: #f8f9fc;
+        color: #2d3748;
+    }
+    
+    /* Sidebar */
+    .css-1d391kg {
+        background-color: #ffffff;
+        border-right: 1px solid #e2e8f0;
+    }
+    
+    /* Inputs */
+    .stTextInput > div > div > input,
+    .stNumberInput > div > div > input,
+    .stSelectbox > div > div > div {
+        background-color: white;
+        color: #2d3748;
+        border: 1px solid #cbd5e0;
+        border-radius: 8px;
+    }
+    
+    /* Labels */
+    label {
+        color: #4a5568 !important;
+        font-weight: 600;
+    }
+    
+    /* Boutons */
+    .stButton > button {
+        background: linear-gradient(90deg, #003366, #005588);
+        color: white;
+        border-radius: 10px;
+        border: none;
+        padding: 0.7rem 1.5rem;
+        font-weight: bold;
+        box-shadow: 0 4px 12px rgba(0, 83, 136, 0.2);
+        transition: all 0.3s;
+    }
+    .stButton > button:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 20px rgba(0, 83, 136, 0.3);
+    }
+    
+    /* Cartes KPI */
+    .card {
+        background-color: white;
+        padding: 2rem;
+        border-radius: 16px;
+        box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+        border: 1px solid #e2e8f0;
+        text-align: center;
+        transition: transform 0.3s;
+    }
+    .card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 12px 30px rgba(0,0,0,0.12);
+    }
+    
+    /* Header principal */
+    .header {
+        background: linear-gradient(135deg, #003366, #005588, #0077b6);
+        padding: 3.5rem 2rem;
+        border-radius: 20px;
+        text-align: center;
+        margin-bottom: 3rem;
+        box-shadow: 0 15px 40px rgba(0,0,0,0.15);
+    }
+    .title {
+        font-size: 3.2rem;
+        font-weight: 800;
+        color: white;
+        margin: 0;
+        text-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    }
+    .subtitle {
+        font-size: 1.5rem;
+        color: #e0eaff;
+        margin: 1rem 0 0 0;
+        font-weight: 400;
+    }
+    
+    /* Graphiques */
+    .plot-container {
+        background-color: white;
+        border-radius: 12px;
+        padding: 1rem;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+    }
+</style>
+""", unsafe_allow_html=True)
+
+
+st.markdown("""
+<div class="header">
+    <h1 class="title">Prédiction de Souscription</h1>
+    <p class="subtitle">Outil d’intelligence artificielle pour l’optimisation des campagnes d’assurance automobile</p>
+</div>
+""", unsafe_allow_html=True)
+
+
 @st.cache_resource
 def load_data_and_model():
     df_raw = pd.read_csv('carInsurance_2024 (3).csv')
     
-    # Calcul durée appel pour dashboard analytique
     def time_to_seconds(t):
         try:
             h, m, s = map(int, str(t).split(':'))
@@ -43,16 +137,13 @@ def load_data_and_model():
     df_raw['CallDuration_min'] = (df_raw['CallEnd'].apply(time_to_seconds) - 
                                   df_raw['CallStart'].apply(time_to_seconds)) / 60.0
     
-    # Dashboard : avec CallDuration_min
     df_dashboard = df_raw.drop(['Id', 'CallStart', 'CallEnd'], axis=1)
     df_dashboard.fillna({'Job': 'unknown', 'Education': 'unknown', 'Communication': 'unknown', 'Outcome': 'unknown'}, inplace=True)
     
-    # Prédiction : exactement comme l'entraînement (sans CallDuration_min, Default, HHInsurance, CarLoan)
     columns_to_drop_pred = ['Id', 'CallStart', 'CallEnd', 'CallDuration_min', 'Default', 'HHInsurance', 'CarLoan']
-    df_pred_template = df_raw.drop(columns_to_drop_pred, axis=1, errors='ignore')
-    df_pred_template.fillna({'Job': 'unknown', 'Education': 'unknown', 'Communication': 'unknown', 'Outcome': 'unknown'}, inplace=True)
+    df_pred = df_raw.drop(columns_to_drop_pred, axis=1, errors='ignore')
+    df_pred.fillna({'Job': 'unknown', 'Education': 'unknown', 'Communication': 'unknown', 'Outcome': 'unknown'}, inplace=True)
     
-    # Chargement du modèle
     model_path = 'modele_assurance_auto.h5'
     if not os.path.exists(model_path):
         st.error(f"Modèle non trouvé : {os.path.abspath(model_path)}")
@@ -60,7 +151,6 @@ def load_data_and_model():
     
     model = load_model(model_path)
     
-    # Préprocesseur (38 features)
     categorical_cols = ['Job', 'Marital', 'Education', 'Communication', 'LastContactMonth', 'Outcome']
     
     ct = ColumnTransformer(
@@ -68,7 +158,7 @@ def load_data_and_model():
         remainder='passthrough'
     )
     
-    X = df_pred_template.drop('CarInsurance', axis=1)
+    X = df_pred.drop('CarInsurance', axis=1)
     X_encoded = ct.fit_transform(X)
     
     sc = StandardScaler()
@@ -81,41 +171,36 @@ df_dashboard, model, ct, sc = load_data_and_model()
 if model is None:
     st.stop()
 
-# ========================= SIDEBAR =========================
+
 with st.sidebar:
-    st.image("https://img.icons8.com/color/96/bank-building.png", width=80)
-    
-    st.markdown(f"""
-    <h2 style='color: {PRIMARY_COLOR}; font-size: 24px;'>
-        Assurance Automobile
-    </h2>
-    <p style='color: #666; font-size: 14px;'>
-        Prédiction de Souscription
-    </p>
-    """, unsafe_allow_html=True)
-    
-    st.markdown("---")
-    st.markdown("### Contexte du Projet")
-    st.write("""
-    Optimisation des campagnes téléphoniques d'une banque américaine 
-    pour la vente d'assurance automobile via un modèle de deep learning.
-    """)
+    st.markdown("<div style='text-align:center; padding:1.5rem;'>", unsafe_allow_html=True)
+    st.image("https://img.icons8.com/color/96/bank-building.png", width=100)
+    st.markdown("<h2 style='color:#003366; text-align:center; margin-top:1rem;'>Banque & Assurance</h2>", unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
     
     st.markdown("### Navigation")
-    page = st.radio("Section", ["Dashboard Analytique", "Prédiction Individuelle", "Prédiction en Batch"])
+    page = st.radio("", ["Dashboard Analytique", "Prédiction Individuelle", "Prédiction en Batch"], label_visibility="collapsed")
     
-    if page == "Dashboard Analytique":
-        st.markdown("### Filtres")
-        selected_month = st.selectbox("Mois", ['Tous'] + sorted(df_dashboard['LastContactMonth'].unique().tolist()))
-        selected_job = st.selectbox("Profession", ['Tous'] + sorted(df_dashboard['Job'].unique().tolist()))
-        selected_comm = st.selectbox("Communication", ['Tous'] + sorted(df_dashboard['Communication'].unique().tolist()))
-    
-    st.markdown("---")
-    st.caption("Projet Réseaux de Neurones Profonds\nOusmane Faye — Décembre 2025")
+    st.markdown("### À propos")
+    st.caption("""
+    Application développée pour l'optimisation des campagnes téléphoniques d'une banque  
+    pour la vente d'assurance automobile via un modèle de deep learning. 
+    **Réseaux de Neurones Profonds**  
+    **Ousmane Faye** — Décembre 2025
+    """)
 
-# ========================= FILTRES DASHBOARD =========================
+
 filtered_df = df_dashboard.copy()
 if page == "Dashboard Analytique":
+    st.markdown("### Filtres d'analyse")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        selected_month = st.selectbox("Mois du contact", ['Tous'] + sorted(df_dashboard['LastContactMonth'].unique().tolist()))
+    with col2:
+        selected_job = st.selectbox("Profession", ['Tous'] + sorted(df_dashboard['Job'].unique().tolist()))
+    with col3:
+        selected_comm = st.selectbox("Canal", ['Tous'] + sorted(df_dashboard['Communication'].unique().tolist()))
+    
     if selected_month != 'Tous':
         filtered_df = filtered_df[filtered_df['LastContactMonth'] == selected_month]
     if selected_job != 'Tous':
@@ -123,19 +208,11 @@ if page == "Dashboard Analytique":
     if selected_comm != 'Tous':
         filtered_df = filtered_df[filtered_df['Communication'] == selected_comm]
 
-# ========================= PAGE DASHBOARD ANALYTIQUE =========================
-if page == "Dashboard Analytique":
-    st.markdown(f"""
-    <div style='background-color: {PRIMARY_COLOR}; padding: 30px; border-radius: 10px; margin-bottom: 30px;'>
-        <h1 style='color: white; margin: 0;'>Dashboard Analytique</h1>
-        <p style='color: #ddd; font-size: 18px; margin: 10px 0 0 0;'>
-            Facteurs clés de souscription à l'assurance automobile
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
 
-    # KPIs
+if page == "Dashboard Analytique":
+    st.markdown("### Indicateurs Clés de Performance")
     col1, col2, col3, col4 = st.columns(4)
+    
     total = len(df_dashboard)
     taux_global = df_dashboard['CarInsurance'].mean() * 100
     taux_filtre = filtered_df['CarInsurance'].mean() * 100
@@ -143,16 +220,39 @@ if page == "Dashboard Analytique":
     success_prev = df_dashboard[df_dashboard['Outcome'] == 'success']['CarInsurance'].mean() * 100
 
     with col1:
-        st.markdown(f"<div style='background:{LIGHT_GRAY}; padding:20px; border-radius:10px; text-align:center; height:160px; display:flex; flex-direction:column; justify-content:center;'><p style='color:#666; margin:0;'>Clients totaux</p><h3 style='color:{PRIMARY_COLOR}; margin:10px 0 0 0;'>{total:,}</h3></div>", unsafe_allow_html=True)
+        st.markdown(f"""
+        <div class="card">
+            <p style='color:#718096; margin:0; font-size:0.95rem;'>Clients analysés</p>
+            <h2 style='color:#003366; margin:0.5rem 0 0 0; font-size:2.5rem;'>{total:,}</h2>
+        </div>
+        """, unsafe_allow_html=True)
     with col2:
-        st.markdown(f"<div style='background:{LIGHT_GRAY}; padding:20px; border-radius:10px; text-align:center; height:160px; display:flex; flex-direction:column; justify-content:center;'><p style='color:#666; margin:0;'>Taux de souscription</p><h3 style='color:{PRIMARY_COLOR}; margin:10px 0 0 0;'>{taux_global:.1f}%</h3><p style='color:#888; font-size:12px; margin:5px 0 0 0;'>{taux_filtre - taux_global:+.1f}% vs actuel</p></div>", unsafe_allow_html=True)
+        st.markdown(f"""
+        <div class="card">
+            <p style='color:#718096; margin:0; font-size:0.95rem;'>Taux de souscription global</p>
+            <h2 style='color:#003366; margin:0.5rem 0 0 0; font-size:2.5rem;'>{taux_global:.1f}%</h2>
+            <p style='color:#4c51bf; font-size:0.9rem; margin:0.5rem 0 0 0;'>
+                {taux_filtre - taux_global:+.1f}% vs filtre actuel
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
     with col3:
-        st.markdown(f"<div style='background:{LIGHT_GRAY}; padding:20px; border-radius:10px; text-align:center; height:160px; display:flex; flex-direction:column; justify-content:center;'><p style='color:#666; margin:0;'>Durée appel moyenne<br>(souscripteurs)</p><h3 style='color:{PRIMARY_COLOR}; margin:10px 0 0 0;'>{duree_moy_sub:.1f} min</h3></div>", unsafe_allow_html=True)
+        st.markdown(f"""
+        <div class="card">
+            <p style='color:#718096; margin:0; font-size:0.95rem;'>Durée moyenne appel<br>(souscripteurs)</p>
+            <h2 style='color:#003366; margin:0.5rem 0 0 0; font-size:2.5rem;'>{duree_moy_sub:.1f} min</h2>
+        </div>
+        """, unsafe_allow_html=True)
     with col4:
-        st.markdown(f"<div style='background:{LIGHT_GRAY}; padding:20px; border-radius:10px; text-align:center; height:160px; display:flex; flex-direction:column; justify-content:center;'><p style='color:#666; margin:0;'>Conversion si succès précédent</p><h3 style='color:{PRIMARY_COLOR}; margin:10px 0 0 0;'>{success_prev:.1f}%</h3></div>", unsafe_allow_html=True)
+        st.markdown(f"""
+        <div class="card">
+            <p style='color:#718096; margin:0; font-size:0.95rem;'>Conversion si succès précédent</p>
+            <h2 style='color:#003366; margin:0.5rem 0 0 0; font-size:2.5rem;'>{success_prev:.1f}%</h2>
+        </div>
+        """, unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown(f"<h2 style='color: {DARK_GRAY};'>Analyses Clés</h2>", unsafe_allow_html=True)
+    st.markdown("### Analyses Stratégiques")
 
     col_left, col_right = st.columns(2)
 
@@ -160,51 +260,44 @@ if page == "Dashboard Analytique":
         st.markdown("#### Taux de Souscription par Profession")
         job_rate = df_dashboard.groupby('Job')['CarInsurance'].mean().sort_values(ascending=True) * 100
         fig_job = px.bar(x=job_rate.values, y=job_rate.index, orientation='h',
-                         color=job_rate.values, color_continuous_scale=['#e6f2ff', SECONDARY_COLOR])
+                         color=job_rate.values, color_continuous_scale=['#e2e8f0', '#003366'])
         fig_job.update_layout(height=500, showlegend=False, margin=dict(l=0,r=0,t=40,b=0))
         st.plotly_chart(fig_job, use_container_width=True)
 
-        st.markdown("#### Saisonnalité")
+        st.markdown("#### Saisonnalité des Campagnes")
         month_order = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec']
         month_rate = df_dashboard.groupby('LastContactMonth')['CarInsurance'].mean().reindex(month_order) * 100
         fig_month = px.line(x=[m.capitalize() for m in month_rate.index], y=month_rate.values,
                             markers=True, line_shape='spline')
-        fig_month.update_traces(line=dict(color=ACCENT_COLOR, width=4))
+        fig_month.update_traces(line=dict(color='#003366', width=5))
         st.plotly_chart(fig_month, use_container_width=True)
 
     with col_right:
-        st.markdown("#### Résultat Campagne Précédente")
+        st.markdown("#### Impact du Résultat Précédent")
         outcome_rate = df_dashboard.groupby('Outcome')['CarInsurance'].mean().sort_values(ascending=False) * 100
         fig_outcome = px.bar(x=outcome_rate.index, y=outcome_rate.values,
-                             color=outcome_rate.values, color_continuous_scale=['#ffcccc','#ccffcc'],
+                             color=outcome_rate.values, color_continuous_scale=['#fed7d7', '#9ae6b4'],
                              text=outcome_rate.round(1).astype(str)+'%')
         fig_outcome.update_traces(textposition='outside')
         st.plotly_chart(fig_outcome, use_container_width=True)
 
-        st.markdown("#### Canal de Communication")
+        st.markdown("#### Efficacité par Canal")
         comm_rate = df_dashboard.groupby('Communication')['CarInsurance'].mean().sort_values(ascending=False) * 100
         fig_comm = px.bar(x=comm_rate.index, y=comm_rate.values,
-                          color=comm_rate.values, color_continuous_scale=['#e6f2ff', SECONDARY_COLOR])
+                          color=comm_rate.values, color_continuous_scale=['#e2e8f0', '#003366'])
         st.plotly_chart(fig_comm, use_container_width=True)
 
-    st.markdown(f"<h2 style='color: {DARK_GRAY};'>Corrélations Numériques</h2>", unsafe_allow_html=True)
+    st.markdown("### Corrélations entre Variables Numériques")
     num_cols = ['Age','Balance','CallDuration_min','NoOfContacts','DaysPassed','PrevAttempts','CarInsurance']
     corr = df_dashboard[num_cols].corr()
     fig_corr = go.Figure(go.Heatmap(z=corr.values, x=corr.columns, y=corr.columns,
                                     colorscale='Blues', text=corr.round(2).values, texttemplate="%{text}"))
     st.plotly_chart(fig_corr, use_container_width=True)
 
-# ========================= PAGE PRÉDICTION INDIVIDUELLE =========================
-elif page == "Prédiction Individuelle":
-    st.markdown(f"""
-    <div style='background-color: {PRIMARY_COLOR}; padding: 30px; border-radius: 10px; margin-bottom: 30px;'>
-        <h1 style='color: white; margin: 0;'>Prédiction pour un Nouveau Client</h1>
-        <p style='color: #ddd; font-size: 18px; margin: 10px 0 0 0;'>
-            Estimez la probabilité de souscription avant l'appel
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
 
+elif page == "Prédiction Individuelle":
+    st.markdown("### Saisie des Informations Client")
+    
     with st.form("prediction_form"):
         c1, c2 = st.columns(2)
         with c1:
@@ -256,33 +349,22 @@ elif page == "Prédiction Individuelle":
             title={'text': "Probabilité de Souscription (%)"},
             gauge={
                 'axis': {'range': [0, 100]},
-                'bar': {'color': ACCENT_COLOR},
-                'threshold': {'line': {'color': "red", 'width': 4}, 'thickness': 0.75, 'value': 50}
+                'bar': {'color': "#003366"},
+                'threshold': {'line': {'color': "red", 'width': 4}, 'value': 50}
             }
         ))
-        fig.update_layout(height=400)
+        fig.update_layout(height=500)
         st.plotly_chart(fig, use_container_width=True)
 
-# ========================= PAGE PRÉDICTION EN BATCH =========================
 else:
-    st.markdown(f"""
-    <div style='background-color: {PRIMARY_COLOR}; padding: 30px; border-radius: 10px; margin-bottom: 30px;'>
-        <h1 style='color: white; margin: 0;'>Prédiction en Batch</h1>
-        <p style='color: #ddd; font-size: 18px; margin: 10px 0 0 0;'>
-            Importez un fichier CSV ou Excel pour prédire la probabilité de souscription sur plusieurs clients
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
-
+    st.markdown("### Prédiction en Batch")
     st.info("""
-    **Format requis du fichier** :
-    - Colonnes obligatoires (exactement ces noms) :
-      Age, Job, Marital, Education, Balance, Communication, LastContactDay, LastContactMonth,
-      NoOfContacts, DaysPassed, PrevAttempts, Outcome
-    - Aucune autre colonne (pas d'Id, CallStart, CallEnd, Default, HHInsurance, CarLoan)
+    **Format requis** :
+    - Colonnes : Age, Job, Marital, Education, Balance, Communication, LastContactDay, LastContactMonth, NoOfContacts, DaysPassed, PrevAttempts, Outcome
+    - Pas de Default, HHInsurance, CarLoan, Id, CallStart, CallEnd
     """)
 
-    uploaded_file = st.file_uploader("Choisir un fichier CSV ou Excel", type=["csv", "xlsx"])
+    uploaded_file = st.file_uploader("Importer un fichier CSV ou Excel", type=["csv", "xlsx"])
 
     if uploaded_file is not None:
         try:
@@ -291,9 +373,6 @@ else:
             else:
                 batch_df = pd.read_excel(uploaded_file)
 
-            st.success(f"Fichier chargé : {uploaded_file.name} — {len(batch_df)} clients")
-
-            # Colonnes requises
             required_cols = ['Age', 'Job', 'Marital', 'Education', 'Balance', 'Communication',
                              'LastContactDay', 'LastContactMonth', 'NoOfContacts',
                              'DaysPassed', 'PrevAttempts', 'Outcome']
@@ -303,7 +382,6 @@ else:
                 st.error(f"Colonnes manquantes : {missing}")
                 st.stop()
 
-            # Préprocessing
             batch_input = batch_df[required_cols].copy()
             batch_input.fillna({'Job': 'unknown', 'Education': 'unknown', 'Communication': 'unknown', 'Outcome': 'unknown'}, inplace=True)
 
@@ -315,17 +393,14 @@ else:
             batch_df['Probability (%)'] = (probabilities * 100).round(2)
             batch_df['Recommendation'] = np.where(probabilities > 0.5, "Prioriser l’appel", "Faible potentiel")
 
-            # Résumé
             st.markdown("### Résumé des Prédictions")
             col1, col2, col3 = st.columns(3)
             col1.metric("Total clients", len(batch_df))
             col2.metric("À prioriser", len(batch_df[batch_df['Recommendation'] == "Prioriser l’appel"]))
             col3.metric("Probabilité moyenne", f"{probabilities.mean()*100:.1f}%")
 
-            # Tableau trié
             st.dataframe(batch_df.sort_values('Probability (%)', ascending=False))
 
-            # Téléchargement
             output = io.BytesIO()
             batch_df.to_csv(output, index=False, encoding='utf-8')
             output.seek(0)
@@ -340,11 +415,15 @@ else:
         except Exception as e:
             st.error(f"Erreur lors du traitement : {str(e)}")
 
-# ========================= PIED DE PAGE =========================
 st.markdown("---")
 st.markdown("""
-<div style='text-align: center; color: #666; padding: 20px;'>
-    <strong>Projet académique</strong> — Introduction aux Réseaux de Neurones Profonds<br>
-    Réalisé par <strong>Ousmane Faye</strong> | Décembre 2025
+<div style='text-align: center; color: #4a5568; padding: 3rem;'>
+    <p style='margin: 0.5rem; font-size: 1.2rem;'>
+        <strong>Projet IA</strong> —  Réseaux de Neurones Profonds
+    </p>
+    <p style='margin: 0.5rem;'>
+        Réalisé par <strong>Ousmane Faye</strong> | Décembre 2025
+    </p>
+    
 </div>
 """, unsafe_allow_html=True)
